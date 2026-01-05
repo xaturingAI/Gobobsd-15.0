@@ -1,0 +1,12 @@
+diff -Naur Scripts-org/2.9.6/Functions/RecipeHandler Scripts/2.9.6/Functions/RecipeHandler
+--- Scripts-org/2.9.6/Functions/RecipeHandler	2008-12-21 15:27:21.000000000 +0000
++++ Scripts/2.9.6/Functions/RecipeHandler	2024-01-04 12:00:00.000000000 +0000
+@@ -45,7 +45,7 @@
+ Resolve_Recipe()
+ {
+     local recipe="$1"
+-    local ps_output=$(ps -ef | grep -v grep | grep "$recipe")
++    local ps_output=$(ps aux | grep -v grep | grep "$recipe")
+     if [ -n "$ps_output" ]; then
+         echo "Recipe $recipe is currently running"
+         return 1

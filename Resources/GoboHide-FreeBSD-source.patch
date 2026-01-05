@@ -1,0 +1,57 @@
+diff -Naur GoboHide-1.3-org/GoboHide.c GoboHide-1.3-FreeBSD/GoboHide.c
+--- GoboHide-1.3-org/GoboHide.c	2024-01-04 12:00:00.000000000 +0000
++++ GoboHide-1.3-FreeBSD/GoboHide.c	2024-01-04 12:00:00.000000000 +0000
+@@ -1,10 +1,15 @@
+ #define FUSE_USE_VERSION 26
++#ifndef FREEBSD
+ #include <fuse.h>
++#else
++#include <fuse/fuse.h>
++#endif
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <errno.h>
+ #include <fcntl.h>
++#include <unistd.h>
+
+ static char *hidden_path = NULL;
+
+@@ -20,6 +25,10 @@
+ static int gobo_getattr(const char *path, struct stat *stbuf) {
+     int res = 0;
+     char fpath[PATH_MAX];
++#ifdef FREEBSD
++    struct statfs fsbuf;
++#endif
+
+     if (hidden_path && strstr(path, hidden_path) == path) {
+         return -ENOENT;
+@@ -50,6 +59,15 @@
+     }
+
+     res = lstat(fpath, stbuf);
++#ifdef FREEBSD
++    // FreeBSD-specific handling
++    if (res == 0) {
++        // Additional FreeBSD-specific stat handling if needed
++    } else {
++        res = -errno;
++    }
++#endif
++
+     return res;
+ }
+
+@@ -100,7 +118,12 @@
+ static int gobo_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+                         off_t offset, struct fuse_file_info *fi) {
+     char fpath[PATH_MAX];
++#ifdef FREEBSD
++    snprintf(fpath, sizeof(fpath), "/%s", path);
++#else
+     snprintf(fpath, sizeof(fpath), "%s%s", basedir, path);
++#endif
+
+     DIR *dp;
+     struct dirent *de;

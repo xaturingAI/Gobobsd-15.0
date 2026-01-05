@@ -1,0 +1,22 @@
+diff -Naur AlienVFS-original/AlienVFS AlienVFS-FreeBSD/AlienVFS
+--- AlienVFS-original/AlienVFS	2024-01-04 12:00:00.000000000 +0000
++++ AlienVFS-FreeBSD/AlienVFS	2024-01-04 12:00:00.000000000 +0000
+@@ -1,5 +1,5 @@
+ #!/usr/bin/lua
+-
++#!/usr/bin/env lua
+ -- AlienVFS: a read-only virtual file system for programming language package managers
+ -- Written by Lucas C. Villa Real <lucasvr@gobolinux.org>
+ -- Released under the GNU GPL version 2
+@@ -10,6 +10,12 @@
+ local config = require "gobo.alienvfs.config"
+ 
+ -- Basic operations on paths
++-- FreeBSD compatibility
++local platform = require "posix.uname"().sysname
++if platform == "FreeBSD" then
++    -- FreeBSD-specific configurations
++end
++
+ local Path = {}
+ Path.__index = Path

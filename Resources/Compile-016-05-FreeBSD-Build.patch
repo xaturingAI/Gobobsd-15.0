@@ -1,0 +1,27 @@
+diff -Naur Compile-org/016/Functions/Build Compile/016/Functions/Build
+--- Compile-org/016/Functions/Build	2024-01-04 12:00:00.000000000 +0000
++++ Compile/016/Functions/Build	2024-01-04 12:00:00.000000000 +0000
+@@ -50,7 +50,7 @@
+ # Detect number of CPU cores for parallel builds
+ Get_CPU_Count()
+ {
+-    local cpu_count=$(nproc 2>/dev/null || grep -c "^processor" /proc/cpuinfo || echo 1)
++    local cpu_count=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || grep -c "^processor" /proc/cpuinfo || echo 1)
+     echo "$cpu_count"
+ }
+ 
+@@ -80,7 +80,12 @@
+ # Configure build environment
+ Setup_Build_Environment()
+ {
+     export MAKEFLAGS="-j$(Get_CPU_Count)"
+-    export CC="gcc"
+-    export CXX="g++"
++    if [ "$(uname -s)" = "FreeBSD" ]; then
++        export CC="cc"
++        export CXX="c++"
++    else
++        export CC="gcc"
++        export CXX="g++"
++    fi
+ }

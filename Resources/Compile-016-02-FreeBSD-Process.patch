@@ -1,0 +1,19 @@
+diff -Naur Compile-org/016/Functions/Process Compile/016/Functions/Process
+--- Compile-org/016/Functions/Process	2024-01-04 12:00:00.000000000 +0000
++++ Compile/016/Functions/Process	2024-01-04 12:00:00.000000000 +0000
+@@ -25,12 +25,12 @@
+ # Check if a process is running
+ Is_Process_Running()
+ {
+     local pid="$1"
+-    kill -0 "$pid" 2>/dev/null
++    ps -p "$pid" >/dev/null 2>&1
+ }
+ 
+ # Kill process by name
+ Kill_By_Name()
+ {
+     local process_name="$1"
+-    pkill "$process_name" 2>/dev/null || killall "$process_name" 2>/dev/null
++    killall "$process_name" 2>/dev/null || pkill "$process_name" 2>/dev/null
+ }

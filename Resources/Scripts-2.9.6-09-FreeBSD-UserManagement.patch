@@ -1,0 +1,30 @@
+diff -Naur Scripts-org/2.9.6/Functions/UserManager Scripts/2.9.6/Functions/UserManager
+--- Scripts-org/2.9.6/Functions/UserManager	2008-12-21 15:27:21.000000000 +0000
++++ Scripts/2.9.6/Functions/UserManager	2024-01-04 12:00:00.000000000 +0000
+@@ -10,15 +10,15 @@
+ # Add user to system
+ Add_User()
+ {
+     local username="$1"
+     local userid="$2"
+     local groupid="$3"
+-    useradd -u "$userid" -g "$groupid" -m "$username" 2>/dev/null || \
+-    adduser -D -u "$userid" -G "$groupid" -m "$username" 2>/dev/null || \
+-    pw useradd "$username" -u "$userid" -g "$groupid" -d /home/$username -m 2>/dev/null
++    pw useradd "$username" -u "$userid" -g "$groupid" -d /home/$username -m 2>/dev/null || \
++    useradd -u "$userid" -g "$groupid" -m "$username" 2>/dev/null || \
++    adduser -D -u "$userid" -G "$groupid" -m "$username" 2>/dev/null
+ }
+ 
+ # Add group to system
+ Add_Group()
+ {
+     local groupname="$1"
+     local groupid="$2"
+-    groupadd -g "$groupid" "$groupname" 2>/dev/null || \
+-    addgroup -g "$groupid" "$groupname" 2>/dev/null || \
+-    pw groupadd "$groupname" -g "$groupid" 2>/dev/null
++    pw groupadd "$groupname" -g "$groupid" 2>/dev/null || \
++    groupadd -g "$groupid" "$groupname" 2>/dev/null || \
++    addgroup -g "$groupid" "$groupname" 2>/dev/null
+ }

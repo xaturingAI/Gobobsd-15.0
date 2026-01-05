@@ -1,0 +1,29 @@
+diff -Naur AlienVFS-original/gobo/alienvfs/pip.lua AlienVFS-FreeBSD/gobo/alienvfs/pip.lua
+--- AlienVFS-original/gobo/alienvfs/pip.lua	2024-01-04 12:00:00.000000000 +0000
++++ AlienVFS-FreeBSD/gobo/alienvfs/pip.lua	2024-01-04 12:00:00.000000000 +0000
+@@ -1,5 +1,10 @@
+ -- AlienVFS: PIP backend
+ -- Written by Lucas C. Villa Real <lucasvr@gobolinux.org>
+ -- Released under the GNU GPL version 2
++
++-- FreeBSD compatibility
++local platform = require "posix.uname"().sysname
++local is_freebsd = platform == "FreeBSD"
++
+ local lfs = require "lfs"
+ local posix = require "posix"
+ local lunajson = require "lunajson"
+@@ -100,6 +105,12 @@
+         return module
+     end,
+ 
++    _getFreeBSDPythonPaths = function(self)
++        if is_freebsd then
++            return {"/usr/local/lib/python3*/site-packages"}
++        end
++        return {}
++    end,
++
+     valid = function(self, path)
+         return string.find(path, "egg-info", 1, true) ~= nil or string.find(path, "dist-info", 1, true) ~= nil
+     end,

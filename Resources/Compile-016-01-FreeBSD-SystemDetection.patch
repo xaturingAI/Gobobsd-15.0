@@ -1,0 +1,18 @@
+diff -Naur Compile-org/016/bin/Compile Compile/016/bin/Compile
+--- Compile-org/016/bin/Compile	2024-01-04 12:00:00.000000000 +0000
++++ Compile/016/bin/Compile	2024-01-04 12:00:00.000000000 +0000
+@@ -15,7 +15,7 @@
+ # Detect the system type
+ if [ -z "$SYSTEM_TYPE" ]; then
+     if [ -f /etc/os-release ]; then
+-        SYSTEM_TYPE=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
++        SYSTEM_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
+     elif [ -f /etc/redhat-release ]; then
+         SYSTEM_TYPE="redhat"
+     elif [ -f /etc/debian_version ]; then
+         SYSTEM_TYPE="debian"
+     else
+-        SYSTEM_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
++        SYSTEM_TYPE=$(uname -s | sed 's/FreeBSD/gobobsd/i' | tr '[:upper:]' '[:lower:]')
+     fi
+ fi

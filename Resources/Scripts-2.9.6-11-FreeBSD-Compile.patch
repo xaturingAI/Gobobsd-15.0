@@ -1,0 +1,60 @@
+diff -Naur Scripts-org/2.9.6/bin/Compile Scripts/2.9.6/bin/Compile
+--- Scripts-org/2.9.6/bin/Compile	2008-12-21 15:27:21.000000000 +0000
++++ Scripts/2.9.6/bin/Compile	2024-01-04 12:00:00.000000000 +0000
+@@ -10,6 +10,10 @@
+ # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ #
+ 
++# FreeBSD compatibility
++FREEBSD_BUILD=1
++export FREEBSD_BUILD
++
+ # Source the Scripts environment
+ if [ -f "$(dirname $0)/../Settings/Scripts.conf" ]; then
+     . "$(dirname $0)/../Settings/Scripts.conf"
+@@ -150,7 +154,7 @@
+ # Determine the architecture
+ if [ -z "$ARCH" ]; then
+     # Try to determine the architecture
+-    ARCH=$(uname -m)
++    ARCH=$(uname -p 2>/dev/null || uname -m)
+ fi
+ 
+ # Set the architecture-specific variables
+@@ -200,7 +204,7 @@
+ # Check if we're running on a supported system
+ if [ -z "$SYSTEM_TYPE" ]; then
+     SYSTEM_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
+-    if [ "$SYSTEM_TYPE" != "linux" ]; then
++    if [ "$SYSTEM_TYPE" != "linux" ] && [ "$SYSTEM_TYPE" != "freebsd" ]; then
+         echo "Warning: $SYSTEM_TYPE is not officially supported"
+     fi
+ fi
+@@ -300,7 +304,7 @@
+ # Configure options for different systems
+ case "$SYSTEM_TYPE" in
+     linux)
+-        CONFIGURE_OPTS="--prefix=$program_dir --sysconfdir=/etc --localstatedir=/var"
++        CONFIGURE_OPTS="--prefix=$program_dir --sysconfdir=/etc --localstatedir=/var --enable-shared --disable-static"
+         ;;
+     *)
+         CONFIGURE_OPTS="--prefix=$program_dir"
+@@ -400,7 +404,7 @@
+ # Handle different make commands
+ if [ -z "$MAKE" ]; then
+     if command -v gmake >/dev/null 2>&1; then
+-        MAKE=gmake
++        MAKE=$(command -v gmake || command -v make)
+     else
+         MAKE=make
+     fi
+@@ -500,7 +504,7 @@
+ # Install command may differ
+ if [ -z "$INSTALL" ]; then
+     if command -v ginstall >/dev/null 2>&1; then
+-        INSTALL=ginstall
++        INSTALL=$(command -v ginstall || command -v install)
+     else
+         INSTALL=install
+     fi
+ fi

@@ -1,0 +1,86 @@
+diff -Naur Installer-org/016/Functions/Filesystem Installer/016/Functions/Filesystem
+--- Installer-org/016/Functions/Filesystem	2024-01-04 12:00:00.000000000 +0000
++++ Installer/016/Functions/Filesystem	2024-01-04 12:00:00.000000000 +0000
+@@ -19,7 +19,7 @@
+ is_filesystem_supported() {
+     local fs_type="$1"
+     case "$fs_type" in
+-        ext2|ext3|ext4|xfs|btrfs|reiserfs|jfs|nilfs2|ufs)
++        ext2|ext3|ext4|xfs|btrfs|reiserfs|jfs|nilfs2|ufs|zfs)
+             return 0
+             ;;
+         *)
+@@ -53,6 +53,14 @@
+     local mountpoint="$2"
+     local fstype="$3"
+ 
++    # FreeBSD-specific handling
++    if [ "$(uname -s)" = "FreeBSD" ]; then
++        if [ "$fstype" = "ufs" ]; then
++            mount -t ufs "$device" "$mountpoint"
++            return $?
++        fi
++        if [ "$fstype" = "zfs" ]; then
++            zfs mount "$device" "$mountpoint"
++            return $?
++        fi
++    fi
++
+     case "$fstype" in
+         ufs)
+             # Use UFS-specific mount command on FreeBSD
+@@ -114,6 +122,14 @@
+             ;;
+         ufs)
+             create_ufs_filesystem "$device" || return 1
+             ;;
++        zfs)
++            # ZFS is handled differently - it's a volume manager and filesystem combined
++            # On FreeBSD, we need to create a ZFS pool
++            local device="$1"
++            local pool_name="gobozfs_$(basename $device | tr -d '0-9')"
++            zpool create -f "$pool_name" "$device" || return 1
++            return 0
++            ;;
+     esac
+ }
++
++# ZFS-specific functions for FreeBSD
++create_zfs_filesystem() {
++    local device="$1"
++    local pool_name="${2:-gobozfs_pool}"
++    echo "Creating ZFS pool $pool_name on $device..."
++    
++    # Check if ZFS is available
++    if ! command -v zpool >/dev/null 2>&1; then
++        echo "Error: ZFS utilities not available"
++        return 1
++    fi
++    
++    # Create ZFS pool
++    zpool create -f "$pool_name" "$device" || return 1
++    
++    # Create default dataset
++    zfs create "$pool_name/ROOT" || return 1
++    
++    return 0
++}
++
++# ZFS filesystem creation
++create_filesystem_zfs() {
++    local device="$1"
++    local pool_name="gobozfs_$(basename $device | tr -d '0-9' | tr '.' '_')"
++    create_zfs_filesystem "$device" "$pool_name"
++}
++
++# ZFS mount function
++mount_zfs_filesystem() {
++    local dataset="$1"  # This would be the ZFS dataset/pool
++    local mountpoint="$2"
++    
++    # ZFS datasets are mounted automatically, but we can force mount if needed
++    zfs mount "$dataset" || return 1
++    # If the dataset is not mounted at the desired location, remount it
++    zfs set mountpoint="$mountpoint" "$dataset" || return 1
++    return 0
++}

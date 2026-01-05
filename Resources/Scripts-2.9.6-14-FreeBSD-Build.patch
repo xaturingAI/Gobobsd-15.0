@@ -1,0 +1,56 @@
+diff -Naur Scripts-org/2.9.6/Functions/Build Scripts/2.9.6/Functions/Build
+--- Scripts-org/2.9.6/Functions/Build	2008-12-21 15:27:21.000000000 +0000
++++ Scripts/2.9.6/Functions/Build	2024-01-04 12:00:00.000000000 +0000
+@@ -25,7 +25,7 @@
+ # Configure build environment
+ Setup_Build_Environment()
+ {
+-    export CC=gcc
+-    export CXX=g++
++    export CC=$(command -v gcc || command -v clang)
++    export CXX=$(command -v g++ || command -v clang++)
+     export CFLAGS="$CFLAGS -I/usr/local/include"
+     export LDFLAGS="$LDFLAGS -L/usr/local/lib"
+ 
+@@ -50,7 +50,7 @@
+ # Run configure script
+ Run_Configure()
+ {
+-    local configure_args="$@"
+-    ./configure $configure_args
++    local configure_args="$@"
++    ./configure $configure_args || ./configure $configure_args --with-sysroot=/usr/local
+ }
+ 
+@@ -75,7 +75,7 @@
+ # Build the package
+ Build_Package()
+ {
+-    if ! make -j$(nproc); then
++    if ! make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1); then
+         echo "Build failed, trying without parallel jobs"
+         make
+     fi
+@@ -100,7 +100,7 @@
+ # Install the package
+ Install_Package()
+ {
+-    if ! make install; then
++    if ! make install && ! gmake install; then
+         echo "Install failed"
+         return 1
+     fi
+     return 0
+@@ -125,7 +125,7 @@
+ # Check for build dependencies
+ Check_Dependencies()
+ {
+-    local deps="$@"
+-    for dep in $deps; do
+-        if ! command -v "$dep" >/dev/null 2>&1; then
++    local deps="$@"
++    for dep in $deps; do
++        if ! command -v "$dep" >/dev/null 2>&1 && ! pkg info "$dep" >/dev/null 2>&1; then
+             echo "Missing dependency: $dep"
+             return 1
+         fi

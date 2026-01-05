@@ -1,0 +1,20 @@
+diff -Naur Scripts-org/2.9.6/Functions/FileSystem Scripts/2.9.6/Functions/FileSystem
+--- Scripts-org/2.9.6/Functions/FileSystem	2008-12-21 15:27:21.000000000 +0000
++++ Scripts/2.9.6/Functions/FileSystem	2024-01-04 12:00:00.000000000 +0000
+@@ -25,9 +25,9 @@
+ Get_Disk_Usage()
+ {
+     local path="$1"
+-    local usage=$(df -h "$path" | tail -n +2 | head -n 1 | awk '{print $5}')
++    local usage=$(df -h "$path" | tail -n +2 | head -n 1 | awk '{print $5}' | sed 's/%//')
+     echo "$usage"
+ }
+ 
+-Get_Inode_Usage()
++Get_Inode_Usage_FreeBSD()
+ {
+     local path="$1"
+-    local usage=$(df -i "$path" | tail -n +2 | head -n 1 | awk '{print $5}')
++    local usage=$(df -i "$path" | tail -n +2 | head -n 1 | awk '{print $5}' | sed 's/%//')
+     echo "$usage"
+ }

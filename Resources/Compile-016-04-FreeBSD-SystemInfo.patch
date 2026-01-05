@@ -1,0 +1,38 @@
+diff -Naur Compile-org/016/Functions/SystemInfo Compile/016/Functions/SystemInfo
+--- Compile-org/016/Functions/SystemInfo	2024-01-04 12:00:00.000000000 +0000
++++ Compile/016/Functions/SystemInfo	2024-01-04 12:00:00.000000000 +0000
+@@ -10,15 +10,25 @@
+ Get_Memory_Info()
+ {
+-    local meminfo=$(grep MemTotal /proc/meminfo | awk '{print $2}')
++    if [ "$(uname -s)" = "FreeBSD" ]; then
++        local meminfo=$(sysctl -n hw.physmem)
++        # Convert from bytes to KB
++        meminfo=$((meminfo / 1024))
++    else
++        local meminfo=$(grep MemTotal /proc/meminfo | awk '{print $2}')
++    fi
+     echo "$meminfo"
+ }
+ 
+ Get_CPU_Info()
+ {
+-    local cpuinfo=$(grep -m 1 "model name" /proc/cpuinfo | cut -d: -f2 | xargs)
++    if [ "$(uname -s)" = "FreeBSD" ]; then
++        local cpuinfo=$(sysctl -n hw.model)
++    else
++        local cpuinfo=$(grep -m 1 "model name" /proc/cpuinfo | cut -d: -f2 | xargs)
++    fi
+     echo "$cpuinfo"
+ }
+ 
+ Get_Load_Average()
+ {
+-    local loadavg=$(cut -d' ' -f1-3 /proc/loadavg)
++    if [ "$(uname -s)" = "FreeBSD" ]; then
++        local loadavg=$(uptime | awk -F'load averages:' '{print $2}' | xargs)
++    else
++        local loadavg=$(cut -d' ' -f1-3 /proc/loadavg)
++    fi
+     echo "$loadavg"
+ }

@@ -1,0 +1,19 @@
+diff -Naur Scripts-org/2.9.6/bin/Compile Scripts/2.9.6/bin/Compile
+--- Scripts-org/2.9.6/bin/Compile	2008-12-21 15:27:21.000000000 +0000
++++ Scripts/2.9.6/bin/Compile	2024-01-05 11:00:00.000000000 +0000
+@@ -100,6 +100,10 @@
+ # Default recipe repository
+ if [ -z "$COMPILE_RECIPES_REPOSITORY" ]; then
+-    COMPILE_RECIPES_REPOSITORY="https://github.com/gobolinux/Recipes.git"
++    # GoboBSD-specific recipe repository
++    if [ "$(uname -s)" = "FreeBSD" ]; then
++        COMPILE_RECIPES_REPOSITORY="https://github.com/xaturingAI/GoboBsdRecipes.git"
++    else
++        COMPILE_RECIPES_REPOSITORY="https://github.com/gobolinux/Recipes.git"
++    fi
+ fi
+
+ # Recipe directory
+ if [ -z "$RECIPES_DIR" ]; then
+     RECIPES_DIR="$SYSTEM_SETTINGS/Compile/Recipes"
+ fi

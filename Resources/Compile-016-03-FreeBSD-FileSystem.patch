@@ -1,0 +1,20 @@
+diff -Naur Compile-org/016/Functions/FileSystem Compile/016/Functions/FileSystem
+--- Compile-org/016/Functions/FileSystem	2024-01-04 12:00:00.000000000 +0000
++++ Compile/016/Functions/FileSystem	2024-01-04 12:00:00.000000000 +0000
+@@ -30,7 +30,7 @@
+ Get_Disk_Usage()
+ {
+     local path="$1"
+-    local usage=$(df -h "$path" | tail -n +2 | head -n 1 | awk '{print $5}' | sed 's/%//')
++    local usage=$(df -h "$path" | awk -v path="$path" '$6 == path {print $5}' | sed 's/%//')
+     echo "$usage"
+ }
+ 
+@@ -45,7 +45,7 @@
+ Get_Inode_Usage()
+ {
+     local path="$1"
+-    local usage=$(df -i "$path" | tail -n +2 | head -n 1 | awk '{print $5}' | sed 's/%//')
++    local usage=$(df -i "$path" | awk -v path="$path" '$6 == path {print $5}' | sed 's/%//')
+     echo "$usage"
+ }

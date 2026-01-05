@@ -1,0 +1,132 @@
+diff -Naur Installer-org/016/bin/Installer Installer/016/bin/Installer
+--- Installer-org/016/bin/Installer	2024-01-04 12:00:00.000000000 +0000
++++ Installer/016/bin/Installer	2024-01-04 12:00:00.000000000 +0000
+@@ -1,10 +1,15 @@
+ #!/bin/bash
+
+ # FreeBSD compatibility
+ FREEBSD_BUILD=1
+ export FREEBSD_BUILD
+
++# Boot loader selection for FreeBSD
++BOOT_LOADER="freebsd"  # Default to FreeBSD boot loader
++export BOOT_LOADER
++
+ # GoboLinux Installer
+ # Copyright (C) 2002-2023 Lucas C. Villa Real <lucasvr@gobolinux.org>
+ # Released under the GNU GPL version 2
+@@ -200,6 +205,50 @@
+     fi
+ }
+
++# FreeBSD-specific boot loader functions
++install_freebsd_boot_loader() {
++    local root_device="$1"
++    local boot_partition="$2"
++    local mount_point="$3"
++
++    echo "Installing FreeBSD boot loader..."
++
++    # Check if we're dealing with ZFS
++    if [ "$FILESYSTEM_TYPE" = "zfs" ]; then
++        echo "Detected ZFS filesystem, configuring ZFS boot..."
++        # For ZFS, we need to enable bootfs property
++        local pool_name=$(echo "$root_device" | cut -d'/' -f1)  # Extract pool name
++        if [ -n "$pool_name" ]; then
++            echo "Setting bootfs property for ZFS pool: $pool_name"
++            zpool set bootfs="$pool_name/ROOT" "$pool_name" 2>/dev/null || true
++        fi
++
++        # Create loader.conf for ZFS boot
++        if [ -d "$mount_point/boot" ]; then
++            echo '# ZFS boot configuration' > "$mount_point/boot/loader.conf"
++            echo 'zfs_load="YES"' >> "$mount_point/boot/loader.conf"
++            echo 'vfs.root.mountfrom="zfs:'$pool_name'/ROOT"' >> "$mount_point/boot/loader.conf"
++            echo 'autoboot_delay="3"' >> "$mount_point/boot/loader.conf"
++        fi
++    else
++        # For UFS, install the FreeBSD boot blocks
++        echo "Installing FreeBSD boot blocks to $root_device..."
++        if [ -b "$root_device" ]; then
++            # Install the boot1 stage to the MBR/partition
++            dd if=/boot/boot1 of="$root_device" count=1 2>/dev/null || true
++            # Install the boot2 stage to the boot partition
++            if [ -b "$boot_partition" ]; then
++                dd if=/boot/boot2 of="$boot_partition" count=1 2>/dev/null || true
++            fi
++        fi
++
++        # Create loader.conf for UFS boot
++        if [ -d "$mount_point/boot" ]; then
++            echo '# UFS boot configuration' > "$mount_point/boot/loader.conf"
++            echo 'autoboot_delay="3"' >> "$mount_point/boot/loader.conf"
++        fi
++    fi
++
++    return 0
++}
++
+ # Mount filesystem
+ mount_filesystem() {
+     local device="$1"
+@@ -300,6 +349,15 @@
+     fi
+ }
+
++# Install boot loader based on system type
++install_boot_loader() {
++    local root_device="$1"
++    local boot_partition="$2"
++    local mount_point="$3"
++
++    if [ "$BOOT_LOADER" = "freebsd" ]; then
++        install_freebsd_boot_loader "$root_device" "$boot_partition" "$mount_point"
++    fi
++}
++
+ # Main installation function
+ install_system() {
+     local device="$1"
+@@ -400,6 +458,10 @@
+     # Mount the target filesystem
+     mount_filesystem "$device" "$mount_point" "$FILESYSTEM_TYPE"
+
++    # Install boot loader
++    install_boot_loader "$device" "$boot_partition" "$mount_point"
++
+     # Create basic directory structure
+     create_basic_structure "$mount_point"
+
+@@ -500,6 +562,15 @@
+     fi
+ }
+
++# FreeBSD-specific partitioning functions
++create_freebsd_partitions() {
++    local device="$1"
++    echo "Creating FreeBSD-style partitions on $device..."
++    # Use gpart to create FreeBSD partitions
++    gpart create -s gpt "$device" || return 1
++    gpart add -t freebsd-boot -s 512k "$device" || return 1
++    gpart add -t freebsd-ufs -l rootfs "$device" || return 1
++    return 0
++}
++
+ # Partition device
+ partition_device() {
+     local device="$1"
+@@ -510,6 +581,11 @@
+     if [ -n "$PARTITION_SCHEME" ]; then
+         case "$PARTITION_SCHEME" in
+             mbr|gpt)
++                if [ "$(uname -s)" = "FreeBSD" ]; then
++                    create_freebsd_partitions "$device"
++                    return $?
++                fi
+                 ;;
+         esac
+     fi
++
+     # Default partitioning scheme
+     parted -s "$device" mklabel gpt ||
+     parted -s "$device" mkpart primary 1MiB 513MiB ||

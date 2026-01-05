@@ -1,0 +1,57 @@
+diff -Naur AlienVFS-original/gobo/alienvfs/cargo.lua AlienVFS-FreeBSD/gobo/alienvfs/cargo.lua
+--- AlienVFS-original/gobo/alienvfs/cargo.lua	2024-01-04 12:00:00.000000000 +0000
++++ AlienVFS-FreeBSD/gobo/alienvfs/cargo.lua	2024-01-04 12:00:00.000000000 +0000
+@@ -1,5 +1,10 @@
+ -- AlienVFS: Cargo backend
+ -- Written by Lucas C. Villa Real <lucasvr@gobolinux.org>
+ -- Released under the GNU GPL version 2
++
++-- FreeBSD compatibility
++local platform = require "posix.uname"().sysname
++local is_freebsd = platform == "FreeBSD"
++
+ -- Supports:
+ -- - Rustup-managed toolchains (rustup install stable)
+ -- - Cargo config files (.cargo/config.toml, .cargo/release.toml)
+@@ -10,6 +15,12 @@
+ local cargo = {
+     cargo_dirs = {},
+     programs_table = {},
++    
++    -- FreeBSD-specific paths
++    freebsd_toolchains = function(self)
++        if is_freebsd then
++            return {os.getenv("HOME") .. "/.cargo/toolchains"}
++        end
++        return {}
++    end,
+ 
+     moduleDirs = function(self)
+         return nil
+     end,
+@@ -40,6 +51,12 @@
+             -- GoboLinux rustup location: $User/Programs/Rust/.rustup/toolchains/
+             if os.getenv("User") ~= nil then
+                 local gobo_rustup_dir = user_dir .. "/Programs/Rust/.rustup/toolchains"
++                if is_freebsd then
++                    -- FreeBSD-specific rustup location
++                    gobo_rustup_dir = user_dir .. "/.rustup/toolchains"
++                end
+                 local gobo_rustup_info = posix.stat(gobo_rustup_dir)
+                 if gobo_rustup_info ~= nil and gobo_rustup_info.type == "directory" then
+                     for toolchain in lfs.dir(gobo_rustup_dir) do
+@@ -100,6 +117,12 @@
+                     end
+                 end
+             end
++            if is_freebsd then
++                -- Check FreeBSD-specific cargo registry location
++                local freebsd_cargo_dir = os.getenv("HOME") .. "/.cargo/registry/src"
++                local info = posix.stat(freebsd_cargo_dir)
++                if info ~= nil and info.type == "directory" then
++                    table.insert(toolchains, freebsd_cargo_dir)
++                end
++            end
+         end
+         return toolchains
+     end,

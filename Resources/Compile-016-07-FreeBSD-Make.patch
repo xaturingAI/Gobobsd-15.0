@@ -1,0 +1,83 @@
+diff -Naur Compile-org/016/Functions/Build Compile/016/Functions/Build
+--- Compile-org/016/Functions/Build	2024-01-04 12:00:00.000000000 +0000
++++ Compile/016/Functions/Build	2024-01-04 12:00:00.000000000 +0000
+@@ -95,6 +95,15 @@
+     fi
+ }
+ 
++# Function to get the appropriate make command for the system
++Get_Make_Command()
++{
++    if [ "$(uname -s)" = "FreeBSD" ]; then
++        # On FreeBSD, prefer gmake (GNU make) over make (BSD make)
++        command -v gmake >/dev/null 2>&1 && echo "gmake" || echo "make"
++    else
++        echo "make"
++    fi
++}
++
+ # Run the build process
+ Run_Build()
+ {
+@@ -100,7 +109,7 @@
+     local build_type="$2"
+     
+     echo "Building $program_name ($build_type)..."
+-    if [ "$build_type" = "autotools" ]; then
++    if [ "$build_type" = "autotools" ]; then
+         # For autotools-based builds
+         local make_cmd=$(Get_Make_Command)
+         $make_cmd -j$(Get_CPU_Count) || return 1
+@@ -150,7 +159,7 @@
+ # Run make install
+ Run_Install()
+ {
+-    make install || return 1
++    $(Get_Make_Command) install || return 1
+ }
+ 
+ # Clean build artifacts
+@@ -160,7 +169,7 @@
+ Run_Clean()
+ {
+     # Use appropriate make command for cleaning
+-    make clean || return 1
++    $(Get_Make_Command) clean || return 1
+ }
+ 
+ # Distclean build artifacts
+@@ -170,7 +179,7 @@
+ Run_DistClean()
+ {
+     # Use appropriate make command for distclean
+-    make distclean || return 1
++    $(Get_Make_Command) distclean || return 1
+ }
+ 
+ # Check if package supports parallel builds
+@@ -200,7 +209,7 @@
+ # Build with make (generic build)
+ Build_With_Make()
+ {
+     local make_cmd=$(Get_Make_Command)
+-    make -j$(Get_CPU_Count) || return 1
++    $make_cmd -j$(Get_CPU_Count) || return 1
+ }
+ 
+ # Build with cmake
+@@ -220,7 +229,7 @@
+ # Install with make
+ Install_With_Make()
+ {
+-    make install || return 1
++    $(Get_Make_Command) install || return 1
+ }
+ 
+ # Run tests if available
+@@ -240,7 +249,7 @@
+ # Run make check/test
+ Run_Tests()
+ {
+-    make check 2>/dev/null || make test 2>/dev/null || true
++    $(Get_Make_Command) check 2>/dev/null || $(Get_Make_Command) test 2>/dev/null || true
+ }

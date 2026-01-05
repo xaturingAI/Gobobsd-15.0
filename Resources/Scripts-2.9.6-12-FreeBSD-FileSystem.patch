@@ -1,0 +1,33 @@
+diff -Naur Scripts-org/2.9.6/Functions/FileSystem Scripts/2.9.6/Functions/FileSystem
+--- Scripts-org/2.9.6/Functions/FileSystem	2008-12-21 15:27:21.000000000 +0000
++++ Scripts/2.9.6/Functions/FileSystem	2024-01-04 12:00:00.000000000 +0000
+@@ -25,7 +25,7 @@
+ # Mount point detection
+ Get_Mount_Point()
+ {
+-    local mount_point=$(df -P "$1" | tail -1 | awk '{print $6}')
++    local mount_point=$(df -P "$1" 2>/dev/null | tail -1 | awk '{print $6}' 2>/dev/null || mount | grep "$(dirname "$1")" | head -1 | awk '{print $3}')
+     echo "$mount_point"
+ }
+ 
+@@ -50,7 +50,7 @@
+ # Check if a filesystem is mounted
+ Is_Mounted()
+ {
+-    local mount_point="$1"
+-    if mount | grep -q "on $mount_point "; then
++    local mount_point="$1"
++    if mount | grep -q "$mount_point "; then
+         return 0
+     else
+         return 1
+@@ -75,7 +75,7 @@
+ # Create a bind mount
+ Create_Bind_Mount()
+ {
+-    if ! mount -o bind "$1" "$2"; then
++    if ! mount -t nullfs "$1" "$2" 2>/dev/null || ! mount -o bind "$1" "$2"; then
+         echo "Error: Failed to create bind mount from $1 to $2"
+         return 1
+     fi
+ }

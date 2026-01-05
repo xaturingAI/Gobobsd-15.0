@@ -1,0 +1,58 @@
+diff -Naur Installer-org/016/bin/Installer Installer/016/bin/Installer
+--- Installer-org/016/bin/Installer	2024-01-04 12:00:00.000000000 +0000
++++ Installer/016/bin/Installer	2024-01-04 12:00:00.000000000 +0000
+@@ -1,15 +1,20 @@
+ #!/bin/bash
+
+ # FreeBSD compatibility
+ FREEBSD_BUILD=1
+ export FREEBSD_BUILD
+
+ # Boot loader selection for FreeBSD
+ BOOT_LOADER="freebsd"  # Default to FreeBSD boot loader
+ export BOOT_LOADER
+
+ # GoboLinux Installer
+ # Copyright (C) 2002-2023 Lucas C. Villa Real <lucasvr@gobolinux.org>
+ # Released under the GNU GPL version 2
+@@ -15,6 +20,15 @@
+ # Source any additional functions
+ if [ -f "$(dirname $0)/../Functions/Boot" ]; then
+     . "$(dirname $0)/../Functions/Boot"
++elif [ -f "$(dirname $0)/../Functions/Boot" ]; then
++    # If the boot functions file doesn't exist yet, define basic functions
++    install_boot_loader() {
++        local root_device="$1"
++        local boot_partition="$2"
++        local mount_point="$3"
++        local filesystem_type="$4"
++        # Placeholder function - will be replaced by actual boot functions
++    }
+ fi
+
+ # Global variables
+@@ -450,15 +459,20 @@
+     # Mount the target filesystem
+     mount_filesystem "$device" "$mount_point" "$FILESYSTEM_TYPE"
+
+-    # Install boot loader
+-    install_boot_loader "$device" "$boot_partition" "$mount_point"
++    # Install boot loader based on filesystem type
++    if command -v install_boot_loader >/dev/null 2>&1; then
++        install_boot_loader "$device" "$boot_partition" "$mount_point" "$FILESYSTEM_TYPE"
++    else
++        echo "Warning: install_boot_loader function not available"
++    fi
+
+     # Create basic directory structure
+     create_basic_structure "$mount_point"
+
+     # Install base system
+     install_base_system "$mount_point"
+
+     # Install programs
+     install_programs "$mount_point"
+
+     # Configure system
+     configure_system "$mount_point"
++

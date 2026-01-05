@@ -1,0 +1,40 @@
+diff -Naur Scripts-org/2.9.6/Functions/Network Scripts/2.9.6/Functions/Network
+--- Scripts-org/2.9.6/Functions/Network	2008-12-21 15:27:21.000000000 +0000
++++ Scripts/2.9.6/Functions/Network	2024-01-04 12:00:00.000000000 +0000
+@@ -5,20 +5,20 @@
+ # Check if network interface is up
+ Is_Interface_Up()
+ {
+     local interface="$1"
+-    if [ -d "/sys/class/net/$interface" ]; then
+-        local operstate=$(cat /sys/class/net/$interface/operstate 2>/dev/null)
+-        if [ "$operstate" = "up" ] || [ "$operstate" = "unknown" ]; then
+-            return 0
+-        fi
+-    fi
+-    return 1
++    if ifconfig "$interface" 2>/dev/null | grep -q "status: active\|status: up"; then
++        return 0
++    else
++        return 1
++    fi
+ }
+ 
+ # Get IP address of interface
+ Get_Interface_IP()
+ {
+     local interface="$1"
+-    local ip=$(ip addr show "$interface" 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
++    local ip=$(ifconfig "$interface" 2>/dev/null | grep 'inet ' | awk '{print $2}')
+     echo "$ip"
+ }
+ 
+ # Restart network service
+ Restart_Network()
+ {
+-    systemctl restart networking 2>/dev/null || \
+-    service networking restart 2>/dev/null || \
+-    /etc/init.d/networking restart 2>/dev/null
++    service netif restart 2>/dev/null || \
++    /etc/rc.d/netif restart 2>/dev/null
+ }

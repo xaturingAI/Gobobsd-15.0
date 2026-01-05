@@ -1,0 +1,132 @@
+diff -Naur Installer-org/016/Functions/Boot Installer/016/Functions/Boot
+--- Installer-org/016/Functions/Boot	1970-01-01 00:00:00.000000000 +0000
++++ Installer/016/Functions/Boot	2024-01-04 12:00:00.000000000 +0000
+@@ -0,0 +1,120 @@
++#!/bin/bash
++# GoboLinux Installer - Boot Functions
++# Functions for handling boot loaders on different systems
++
++# Check if we're on FreeBSD
++if [ "$(uname -s)" = "FreeBSD" ]; then
++    FREEBSD_BOOT=1
++    export FREEBSD_BOOT
++else
++    FREEBSD_BOOT=0
++fi
++
++# Install appropriate boot loader based on system and filesystem type
++install_boot_loader() {
++    local root_device="$1"
++    local boot_partition="$2"
++    local mount_point="$3"
++    local filesystem_type="$4"
++
++    if [ "$FREEBSD_BOOT" = "1" ]; then
++        install_freebsd_boot_loader "$root_device" "$boot_partition" "$mount_point" "$filesystem_type"
++    else
++        install_grub_boot_loader "$root_device" "$boot_partition" "$mount_point"
++    fi
++}
++
++# Install FreeBSD boot loader
++install_freebsd_boot_loader() {
++    local root_device="$1"
++    local boot_partition="$2"
++    local mount_point="$3"
++    local filesystem_type="$4"
++
++    echo "Installing FreeBSD boot loader for $filesystem_type..."
++
++    # Create boot directory if it doesn't exist
++    mkdir -p "$mount_point/boot"
++
++    if [ "$filesystem_type" = "zfs" ]; then
++        install_zfs_boot "$root_device" "$mount_point"
++    else
++        install_ufs_boot "$root_device" "$boot_partition" "$mount_point"
++    fi
++}
++
++# Install ZFS boot configuration
++install_zfs_boot() {
++    local root_device="$1"
++    local mount_point="$2"
++
++    echo "Configuring ZFS boot..."
++
++    # Extract pool name from the root device
++    # Assuming format like zroot/ROOT/default
++    local pool_name=$(echo "$root_device" | cut -d'/' -f1)
++    if [ -z "$pool_name" ]; then
++        # If root_device is a disk, try to find the ZFS pool
++        pool_name=$(zpool list -H -o name 2>/dev/null | head -n 1)
++    fi
++
++    if [ -n "$pool_name" ]; then
++        # Set the bootfs property for the pool
++        zpool set bootfs="$pool_name/ROOT" "$pool_name" 2>/dev/null || {
++            # If the dataset doesn't exist, try a simpler name
++            zpool set bootfs="$pool_name" "$pool_name" 2>/dev/null
++        }
++
++        # Create loader.conf for ZFS boot
++        cat > "$mount_point/boot/loader.conf" << EOF
++# ZFS Boot Configuration for GoboBSD
++zfs_load="YES"
++geom_label_load="YES"
++vfs.root.mountfrom="zfs:$pool_name/ROOT"
++autoboot_delay="3"
++kern.geom.label.disk_ident.enable="0"
++kern.geom.label.ufs.enable="0"
++EOF
++
++        # Create device.hints for FreeBSD
++        cat > "$mount_point/boot/device.hints" << EOF
++# Device hints for GoboBSD
++hint.acpi.0.disabled="0"
++hint.atkbd.0.disabled="0"
++hint.psm.0.disabled="0"
++EOF
++    else
++        echo "Warning: Could not determine ZFS pool name for boot configuration"
++    fi
++}
++
++# Install UFS boot configuration
++install_ufs_boot() {
++    local root_device="$1"
++    local boot_partition="$2"
++    local mount_point="$3"
++
++    echo "Installing UFS boot blocks..."
++
++    # Install the boot1 stage to the GPT header
++    if [ -b "$root_device" ]; then
++        # Install the bootcode to the GPT partition
++        gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 "$root_device" 2>/dev/null || {
++            # Fallback: try manual installation
++            if [ -f "/boot/boot1" ] && [ -b "$root_device" ]; then
++                dd if=/boot/boot1 of="$root_device" count=1 2>/dev/null || true
++            fi
++        }
++    fi
++
++    # Create loader.conf for UFS boot
++    cat > "$mount_point/boot/loader.conf" << EOF
++# UFS Boot Configuration for GoboBSD
++autoboot_delay="3"
++kern.geom.label.disk_ident.enable="0"
++kern.geom.label.ufs.enable="0"
++EOF
++}
++
++# Install GRUB boot loader (for Linux compatibility)
++install_grub_boot_loader() {
++    local root_device="$1"
++    local boot_partition="$2"
++    local mount_point="$3"
++
++    # GRUB installation code would go here
++    echo "Installing GRUB boot loader..."
++    # This is the original GRUB installation code
++}

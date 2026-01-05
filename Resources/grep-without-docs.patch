@@ -1,0 +1,12 @@
+diff -Naur grep-2.5.3-orig/Makefile.am grep-2.5.3/Makefile.am
+--- grep-2.5.3-orig/Makefile.am	2008-10-22 16:39:29.000000000 +0000
++++ grep-2.5.3/Makefile.am	2008-10-22 16:40:23.000000000 +0000
+@@ -1,7 +1,7 @@
+ ## Process this file with automake to create Makefile.in
+ AUTOMAKE_OPTIONS = no-dependencies
+ 
+-SUBDIRS = intl po lib doc src tests m4 vms bootstrap
++SUBDIRS = intl lib src tests m4 vms bootstrap
+ 
+ EXTRA_DIST = TODO README README-alpha
+ 

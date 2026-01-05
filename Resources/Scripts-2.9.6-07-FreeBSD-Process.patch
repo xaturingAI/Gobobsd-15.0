@@ -1,0 +1,28 @@
+diff -Naur Scripts-org/2.9.6/Functions/Process Scripts/2.9.6/Functions/Process
+--- Scripts-org/2.9.6/Functions/Process	2008-12-21 15:27:21.000000000 +0000
++++ Scripts/2.9.6/Functions/Process	2024-01-04 12:00:00.000000000 +0000
+@@ -15,15 +15,15 @@
+ # Kill processes by name
+ Kill_By_Name()
+ {
+     local process_name="$1"
+-    pkill "$process_name" 2>/dev/null || killall "$process_name" 2>/dev/null
++    killall "$process_name" 2>/dev/null || pkill "$process_name" 2>/dev/null
+ }
+ 
+ # Get process ID by name
+ Get_PID_By_Name()
+ {
+     local process_name="$1"
+-    local pid=$(pidof "$process_name")
++    local pid=$(pgrep "$process_name" | head -n 1)
+     echo "$pid"
+ }
+ 
+ # Check if process is running
+ Is_Process_Running()
+ {
+     local pid="$1"
+-    kill -0 "$pid" 2>/dev/null
++    ps -p "$pid" >/dev/null 2>&1
+ }

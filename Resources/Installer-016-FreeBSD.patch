@@ -1,0 +1,77 @@
+diff -Naur Installer-org/016/bin/Installer Installer/016/bin/Installer
+--- Installer-org/016/bin/Installer	2024-01-04 12:00:00.000000000 +0000
++++ Installer/016/bin/Installer	2024-01-04 12:00:00.000000000 +0000
+@@ -1,4 +1,10 @@
+ #!/bin/bash
++
++# FreeBSD compatibility
++FREEBSD_BUILD=1
++export FREEBSD_BUILD
++
+ # GoboLinux Installer
+ # Copyright (C) 2002-2023 Lucas C. Villa Real <lucasvr@gobolinux.org>
+ # Released under the GNU GPL version 2
+@@ -20,7 +26,7 @@
+ # Detect the system type
+ if [ -z "$SYSTEM_TYPE" ]; then
+     if [ -f /etc/os-release ]; then
+-        SYSTEM_TYPE=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
++        SYSTEM_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
+     elif [ -f /etc/redhat-release ]; then
+         SYSTEM_TYPE="redhat"
+     elif [ -f /etc/debian_version ]; then
+@@ -50,7 +56,7 @@
+ # Check for required tools
+ check_required_tools() {
+     local tools="awk sed grep find mount umount mkfs"
+-    for tool in $tools; do
++    for tool in $tools gawk gsed ggrep; do
+         if ! command -v "$tool" >/dev/null 2>&1; then
+             echo "Error: Required tool $tool not found"
+             exit 1
+         fi
+     done
+ }
+@@ -100,7 +106,7 @@
+ # Mount point detection
+ get_mount_point() {
+     local path="$1"
+-    df -P "$path" | tail -1 | awk '{print $6}'
++    df -P "$path" 2>/dev/null | tail -1 | awk '{print $6}' 2>/dev/null || mount | grep "$(dirname "$path")" | head -1 | awk '{print $3}'
+ }
+ 
+@@ -150,7 +156,7 @@
+ # Check if filesystem is supported
+ is_filesystem_supported() {
+     local fs_type="$1"
+-    case "$fs_type" in
++    case "$fs_type" in
+         ext2|ext3|ext4|xfs|btrfs|reiserfs|jfs|nilfs2|ufs|zfs)
+             return 0
+             ;;
+@@ -200,7 +206,7 @@
+ # Create filesystem
+ create_filesystem() {
+     local device="$1"
+-    local fstype="$2"
++    local fstype="${2:-ufs}"  # Default to UFS for FreeBSD
+     echo "Creating $fstype filesystem on $device..."
+     case "$fstype" in
+         ext2|ext3|ext4)
+@@ -250,7 +256,15 @@
+ # Mount filesystem
+ mount_filesystem() {
+     local device="$1"
+-    local mountpoint="$2"
++    local mountpoint="$2"
++    local fstype="$3"
++
++    # FreeBSD-specific mount options
++    if [ "$(uname -s)" = "FreeBSD" ]; then
++        if [ "$fstype" = "zfs" ]; then
++            zfs mount "$device" "$mountpoint"
++            return $?
++        fi
++    fi
+     mount "$device" "$mountpoint"
+ }

@@ -1,0 +1,101 @@
+diff -Naur AlienVFS-original/AlienVFS AlienVFS-FreeBSD/AlienVFS
+--- AlienVFS-original/AlienVFS	2024-01-04 12:00:00.000000000 +0000
++++ AlienVFS-FreeBSD/AlienVFS	2024-01-04 12:00:00.000000000 +0000
+@@ -1,5 +1,5 @@
+-#!/usr/bin/lua
++#!/usr/bin/env lua
+ -- AlienVFS: a read-only virtual file system for programming language package managers
+ -- Written by Lucas C. Villa Real <lucasvr@gobolinux.org>
+ -- Released under the GNU GPL version 2
+@@ -10,6 +10,15 @@
+ local config = require "gobo.alienvfs.config"
+
+ -- Basic operations on paths
++-- FreeBSD compatibility
++local platform = require "posix.uname"().sysname
++local is_freebsd = platform == "FreeBSD"
++
++-- FreeBSD-specific functions
++local function get_filesystem_type(path)
++    if is_freebsd then
++        local handle = io.popen("df -T " .. path .. " 2>/dev/null | tail -n +2 | awk '{print $2}'")
++        if handle then
++            local result = handle:read("*l")
++            handle:close()
++            if result then
++                return string.gsub(result, "%s+", "")  -- trim whitespace
++            end
++        end
++    end
++    return "unknown"
++end
++
+ local Path = {}
+ Path.__index = Path
+@@ -50,6 +63,15 @@
+     return string.sub(path, 1, -2)
+ end
+
++-- FreeBSD-specific path normalization
++local function normalize_path_freebsd(path)
++    if is_freebsd then
++        -- Normalize paths for UFS/ZFS on FreeBSD
++        path = string.gsub(path, "/usr/lib64/", "/usr/local/lib/")
++        path = string.gsub(path, "/lib64/", "/lib/")
++    end
++    return path
++end
++
+ -- Remove trailing slash
+ local function remove_trailing_slash(path)
+     if string.sub(path, -1) == "/" then
+@@ -100,6 +116,12 @@
+     -- Mount the filesystem
+     local success, err = xpcall(function()
+         -- Main mounting logic here
++        if is_freebsd then
++            -- FreeBSD-specific mount preparation
++            mount_point = normalize_path_freebsd(mount_point)
++            -- Ensure proper permissions for FreeBSD
++            os.execute("chmod 755 " .. mount_point .. " 2>/dev/null")
++        end
+     end, debug.traceback)
+ 
+     if not success then
+         print("Error mounting AlienVFS: " .. tostring(err))
+         return false
+     end
+@@ -200,6 +218,15 @@
+     -- Main AlienVFS loop
+     while true do
+         -- Process FUSE requests
++        if is_freebsd then
++            -- FreeBSD-specific handling for UFS/ZFS
++            -- Check if the underlying filesystem supports the features we need
++            local fs_type = get_filesystem_type(mount_point)
++            if fs_type == "zfs" then
++                print("AlienVFS: Detected ZFS filesystem at " .. mount_point)
++            elseif fs_type == "ufs" then
++                print("AlienVFS: Detected UFS filesystem at " .. mount_point)
++            end
++        end
+         -- Process the next request
+         local req = fuse:read_request()
+         if not req then
+             break
+         end
+     end
+@@ -300,6 +319,12 @@
+     -- Print usage information
+     local function print_usage()
+         print("AlienVFS: a read-only virtual file system for programming language package managers")
++        if is_freebsd then
++            print("-- FreeBSD UFS/ZFS support enabled")
++            print("-- Supports both UFS and ZFS filesystems")
++            print("-- Uses /usr/local paths for compatibility")
++        end
+         print("Usage: AlienVFS [options] mount_point")
+         print("Options:")
+         print("  -h, --help     Show this help message")
+         print("  -v, --verbose  Enable verbose output")
+     end

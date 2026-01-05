@@ -1,0 +1,30 @@
+diff -Naur Compile-org/016/Functions/Network Compile/016/Functions/Network
+--- Compile-org/016/Functions/Network	2024-01-04 12:00:00.000000000 +0000
++++ Compile/016/Functions/Network	2024-01-04 12:00:00.000000000 +0000
+@@ -5,15 +5,15 @@
+ # Check for network connectivity
+ Check_Network_Connectivity()
+ {
+-    ping -c 1 8.8.8.8 >/dev/null 2>&1
++    ping -c 1 8.8.8.8 >/dev/null 2>&1 || ping -c 1 1.1.1.1 >/dev/null 2>&1
+     return $?
+ }
+ 
+ # Download file using available tools
+ Download_File()
+ {
+     local url="$1"
+     local destination="$2"
+-    if command -v wget >/dev/null 2>&1; then
+-        wget "$url" -O "$destination"
+-    elif command -v curl >/dev/null 2>&1; then
+-        curl "$url" -o "$destination"
++    if command -v fetch >/dev/null 2>&1; then
++        fetch -o "$destination" "$url"
++    elif command -v wget >/dev/null 2>&1; then
++        wget "$url" -O "$destination"
++    elif command -v curl >/dev/null 2>&1; then
++        curl "$url" -o "$destination"
+     else
+         echo "No download tool available"
+         return 1

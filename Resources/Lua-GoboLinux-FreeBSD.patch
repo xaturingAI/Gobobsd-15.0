@@ -1,0 +1,96 @@
+diff -Naur Lua-GoboLinux-org/src/fs/fs.c Lua-GoboLinux-FreeBSD/src/fs/fs.c
+--- Lua-GoboLinux-org/src/fs/fs.c	2008-03-16 16:00:00.000000000 +0000
++++ Lua-GoboLinux-FreeBSD/src/fs/fs.c	2024-01-05 04:30:00.000000000 +0000
+@@ -1,12 +1,20 @@
+ #include <stdio.h>
+ #include <errno.h>
+ #include <string.h>
+-#include <sys/sysmacros.h>
++#ifdef __FreeBSD__
++  #include <sys/param.h>
++  #include <sys/mount.h>
++  #include <sys/stat.h>
++#else
++  #include <sys/sysmacros.h>
++#endif
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <unistd.h>
+ #include <lua.h>
+ #include <lualib.h>
+ #include <lauxlib.h>
+ 
+ #include "fs.h"
+@@ -20,7 +28,15 @@
+ static int l_mknod (lua_State *L) {
+ 	int major, minor;
+ 	size_t ltype=0;
+ 	char * path, *type;
+ 	path = (char *)luaL_checkstring(L,1);
+ 	type = (char *)luaL_checklstring(L,2,&ltype);
++#ifdef __FreeBSD__
++	// FreeBSD uses different constants for device types
++	#define S_IFSOCK 0140000
++	#define S_IFLNK	 0120000
++	#define S_IFBLK  060000
++	#define S_IFCHR  020000
++	#define S_IFIFO  010000
++	#define S_IFREG  0100000
++#endif
+ 	if (strncmp(type, LUA_NOD_REGULAR,ltype) == 0) {
+ 		if (mknod(path,S_IFREG,(dev_t)NULL) < 0) {
+ 			lua_pushnil(L);
+ 			lua_pushstring(L,strerror(errno));
+ 			return 2;
+ 		}
+ 	}
+ 	else if (strncmp(type, LUA_NOD_FIFO,ltype) == 0) {
+ 		if (mknod(path,S_IFIFO,(dev_t)NULL) < 0) {
+ 			lua_pushnil(L);
+ 			lua_pushstring(L,strerror(errno));
+ 			return 2;
+ 		}
+ 	}
+ 	else if (strncmp(type, LUA_NOD_SOCKET,ltype) == 0) {
+ 		if (mknod(path, S_IFSOCK,(dev_t)NULL) < 0) {
+ 			lua_pushnil(L);
+ 			lua_pushstring(L,strerror(errno));
+ 			return 2;
+ 		}
+ 	} 
+ 	else if (strncmp(type, LUA_NOD_BLOCK,ltype) == 0) {
+ 		major = luaL_checknumber(L,3);
+ 		minor = luaL_checknumber(L,4);
++#ifdef __FreeBSD__
++		// On FreeBSD, use mkfifo for character devices and blocks differently
++		if (mknod(path, S_IFBLK | 0600, makedev(major,minor)) < 0) {
++#else
+ 		if (mknod(path, S_IFBLK, makedev(major,minor)) < 0) {
++#endif
+ 			lua_pushnil(L);
+ 			lua_pushstring(L,strerror(errno));
+ 			return 2;
+ 		}
+ 	}
+ 	else if (strncmp(type, LUA_NOD_CHAR,ltype) == 0) {
+ 		major = luaL_checknumber(L,3);
+ 		minor = luaL_checknumber(L,4);
++#ifdef __FreeBSD__
++		if (mknod(path, S_IFCHR | 0600, makedev(major, minor)) < 0) {
++#else
+ 		if (mknod(path, S_IFCHR, makedev(major, minor)) < 0) {
++#endif
+ 			lua_pushnil(L);
+ 			lua_pushstring(L,strerror(errno));
+ 			return 2;
+ 		}
+ 	}
+ 	else {
+ 		lua_pushnil(L);
+ 		lua_pushfstring(L,"Type %s unknow\n",type);
+ 		return 2;
+ 	}
+ 	lua_pushboolean(L,LUA_TRUE);
+ 	return 1;
+ }

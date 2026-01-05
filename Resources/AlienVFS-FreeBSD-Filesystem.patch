@@ -1,0 +1,185 @@
+diff -Naur AlienVFS-original/gobo/alienvfs/config.lua AlienVFS-FreeBSD/gobo/alienvfs/config.lua
+--- AlienVFS-original/gobo/alienvfs/config.lua	2024-01-04 12:00:00.000000000 +0000
++++ AlienVFS-FreeBSD/gobo/alienvfs/config.lua	2024-01-04 12:00:00.000000000 +0000
+@@ -10,6 +10,15 @@
+     local dirs = {}
+     for _, pattern in pairs(patterns) do
+         local matches = glob.glob(pattern, 0)
++        
++        -- FreeBSD filesystem-specific adjustments
++        if is_freebsd then
++            -- Adjust for UFS/ZFS specific paths
++            pattern = string.gsub(pattern, "/usr/lib64/", "/usr/local/lib/")
++            pattern = string.gsub(pattern, "/lib64/", "/lib/")
++            -- Handle ZFS mount points which might be in different locations
++            pattern = string.gsub(pattern, "/Programs", "/usr/local/Programs")
++        end
+         if matches then
+             for _, dirname in pairs(matches) do
+                 table.insert(dirs, dirname)
+             end
+         end
+     end
+     return dirs
+ end
+
+ -- FreeBSD-specific filesystem detection
+ local function get_filesystem_type(path)
+     if is_freebsd then
+         local handle = io.popen("df -T " .. path .. " 2>/dev/null | tail -n +2 | awk '{print $2}'")
+         if handle then
+             local result = handle:read("*l")
+             handle:close()
+             if result then
+                 return string.gsub(result, "%s+", "")  -- trim whitespace
+             end
+         end
+     end
+     return "unknown"
+ end
+
+ -- Enhanced path resolution for FreeBSD UFS/ZFS
+ local function resolve_path_for_filesystem(path, fs_type)
+     if is_freebsd then
+         if fs_type == "ufs" or fs_type == "zfs" then
+             -- For UFS and ZFS on FreeBSD, check common locations
+             local alt_paths = {
+                 string.gsub(path, "/usr/lib64/", "/usr/local/lib/"),
+                 string.gsub(path, "/lib64/", "/lib/"),
+                 string.gsub(path, "/usr/lib/", "/usr/local/lib/"),
+                 string.gsub(path, "/Programs/", "/usr/local/Programs/")
+             }
+             
+             for _, alt_path in ipairs(alt_paths) do
+                 local matches = glob.glob(alt_path, 0)
+                 if matches then
+                     return matches
+                 end
+             end
+         end
+     end
+     return glob.glob(path, 0)
+ end
+
+ -- Update scan_dirs to use filesystem-aware path resolution
+ local function scan_dirs_fs_aware(patterns)
+     local dirs = {}
+     for _, pattern in pairs(patterns) do
+         local fs_type = get_filesystem_type(pattern)
+         local matches = resolve_path_for_filesystem(pattern, fs_type)
+         
+         if matches then
+             for _, dirname in pairs(matches) do
+                 table.insert(dirs, dirname)
+             end
+         end
+     end
+     return dirs
+ end
+
+ -- Update the main config to use filesystem-aware scanning on FreeBSD
+ local config = {
+     pip_directories = function(self)
+         local dirs
+         if is_freebsd then
+             dirs = scan_dirs_fs_aware({
+                 "/System/Aliens/PIP",
+                 "/System/Aliens/PIP/lib/python*/site-packages",
+                 "/Programs/Python/*.*/*/lib/python*/site-packages",
+                 "/usr/local/lib/python*/site-packages",
+                 "/usr/lib/python*/site-packages"
+             })
+         else
+             dirs = scan_dirs({
+                 "/System/Aliens/PIP",
+                 "/System/Aliens/PIP/lib/python*/site-packages",
+                 "/Programs/Python/*.*/*/lib/python*/site-packages",
+                 "/usr/lib64/python*/site-packages",
+                 "/usr/lib/python*/site-packages"
+             })
+         end
+         return dirs
+     end,
+
+     pip3_directories = function(self)
+         local dirs
+         if is_freebsd then
+             dirs = scan_dirs_fs_aware({
+                 "/System/Aliens/PIP3",
+                 "/System/Aliens/PIP3/lib/python*/site-packages",
+                 "/Programs/Python/*.*/*/lib/python*/site-packages",
+                 "/usr/local/lib/python*/site-packages",
+                 "/usr/lib/python*/site-packages"
+             })
+         else
+             dirs = scan_dirs({
+                 "/System/Aliens/PIP3",
+                 "/System/Aliens/PIP3/lib/python*/site-packages",
+                 "/Programs/Python/*.*/*/lib/python*/site-packages",
+                 "/usr/lib64/python*/site-packages",
+                 "/usr/lib/python*/site-packages"
+             })
+         end
+         return dirs
+     end,
+
+     luarocks_directories = function(self)
+         local dirs
+         if is_freebsd then
+             dirs = scan_dirs_fs_aware({
+                 "/System/Aliens/LuaRocks",
+                 "/System/Aliens/LuaRocks/lib/luarocks/rocks*",
+                 "/usr/local/lib/lua/*/luarocks/rocks*",
+                 "/usr/lib/lua/*/luarocks/rocks*"
+             })
+         else
+             dirs = scan_dirs({
+                 "/System/Aliens/LuaRocks",
+                 "/System/Aliens/LuaRocks/lib/luarocks/rocks*",
+                 "/usr/lib64/lua/*/luarocks/rocks*",
+                 "/usr/lib/lua/*/luarocks/rocks*"
+             })
+         end
+         return dirs
+     end,
+
+     cpan_directories = function(self)
+         local arch = require "posix.uname"().machine
+         local dirs
+         if is_freebsd then
+             dirs = scan_dirs_fs_aware({
+                 "/System/Aliens/CPAN",
+                 "/System/Aliens/CPAN/lib/perl*/" .. arch .. "*/auto",
+                 "/usr/local/lib/perl*/" .. arch .. "*/auto",
+                 "/usr/lib/perl*/" .. arch .. "*/auto"
+             })
+         else
+             dirs = scan_dirs({
+                 "/System/Aliens/CPAN",
+                 "/System/Aliens/CPAN/lib/perl*/" .. arch .. "*/auto",
+                 "/usr/lib64/perl*/" .. arch .. "*/auto",
+                 "/usr/lib/perl*/" .. arch .. "*/auto"
+             })
+         end
+         return dirs
+     end,
+
+     inotify_directories = function(self)
+         local arch = require "posix.uname"().machine
+         local dirs
+         if is_freebsd then
+             dirs = scan_dirs_fs_aware({
+                 "/System/Aliens/CPAN/lib/perl*/" .. arch .. "*/auto",
+                 "/usr/local/lib/perl*/" .. arch .. "*/auto",
+                 "/usr/lib/perl*/" .. arch .. "*/auto"
+             })
+         else
+             dirs = scan_dirs({
+                 "/System/Aliens/CPAN/lib/perl*/" .. arch .. "*/auto",
+                 "/usr/lib64/perl*/" .. arch .. "*/auto",
+                 "/usr/lib/perl*/" .. arch .. "*/auto"
+             })
+         end
+         return dirs
+     end
+ }

@@ -1,0 +1,25 @@
+diff -Naur GoboHide-1.3-org/Makefile GoboHide-1.3-FreeBSD/Makefile
+--- GoboHide-1.3-org/Makefile	2024-01-04 12:00:00.000000000 +0000
++++ GoboHide-1.3-FreeBSD/Makefile	2024-01-04 12:00:00.000000000 +0000
+@@ -1,10 +1,15 @@
+ CC=gcc
+-CFLAGS=-Wall -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse
+-LDFLAGS=-L/usr/lib -lfuse
++CFLAGS=-Wall -D_FILE_OFFSET_BITS=64
++LDFLAGS=-lfuse
++
++# FreeBSD-specific settings
++UNAME_S := $(shell uname -s)
++ifneq ($(filter FreeBSD,$(UNAME_S)),)
++    CFLAGS += -I/usr/local/include/fuse29 -DFREEBSD
++    LDFLAGS += -L/usr/local/lib -lfuse
++endif
+
+ all: GoboHide
+
+ GoboHide: GoboHide.c
+-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
++	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+
+ clean:
+ 	rm -f GoboHide

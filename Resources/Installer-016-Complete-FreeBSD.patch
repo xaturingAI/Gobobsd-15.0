@@ -1,0 +1,356 @@
+diff -Naur Installer-org/016/bin/Installer Installer/016/bin/Installer
+--- Installer-org/016/bin/Installer	2024-01-04 12:00:00.000000000 +0000
++++ Installer/016/bin/Installer	2024-01-04 12:00:00.000000000 +0000
+@@ -1,15 +1,30 @@
+ #!/bin/bash
+
++# GoboBSD-specific installer modifications
++# This installer is adapted for FreeBSD-based GoboBSD system
++
+ # FreeBSD compatibility
+ FREEBSD_BUILD=1
+ export FREEBSD_BUILD
+
+ # Boot loader selection for FreeBSD
+ BOOT_LOADER="freebsd"  # Default to FreeBSD boot loader
+ export BOOT_LOADER
+
++# Filesystem type (defaults to UFS for FreeBSD)
++FILESYSTEM_TYPE="ufs"
++export FILESYSTEM_TYPE
++
++# GoboBSD-specific settings
++GOBOBSD_INSTALL=1
++export GOBOBSD_INSTALL
++
+ # GoboLinux Installer
+ # Copyright (C) 2002-2023 Lucas C. Villa Real <lucasvr@gobolinux.org>
+ # Released under the GNU GPL version 2
+@@ -20,6 +35,15 @@
+ # Detect the system type
+ if [ -z "$SYSTEM_TYPE" ]; then
+     if [ -f /etc/os-release ]; then
+         SYSTEM_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
+     elif [ -f /etc/redhat-release ]; then
+         SYSTEM_TYPE="redhat"
+     elif [ -f /etc/debian_version ]; then
+         SYSTEM_TYPE="debian"
++    elif [ -f /bin/freebsd-version ]; then
++        # FreeBSD detection
++        SYSTEM_TYPE="freebsd"
++        # Set default filesystem type for FreeBSD
++        FILESYSTEM_TYPE="ufs"
++        if command -v zpool >/dev/null 2>&1; then
++            # Check if ZFS is available and preferred
++            FILESYSTEM_TYPE="zfs"
++        fi
+     else
+         SYSTEM_TYPE="unknown"
+     fi
+ fi
+@@ -50,7 +74,7 @@
+ # Check for required tools
+ check_required_tools() {
+     local tools="awk sed grep find mount umount"
+-    for tool in $tools; do
++    for tool in $tools gawk gsed ggrep gpart zpool zfs; do
+         if ! command -v "$tool" >/dev/null 2>&1; then
+             echo "Warning: Recommended tool $tool not found (may be needed for FreeBSD)"
+         fi
+     done
+ }
+@@ -100,7 +124,7 @@
+ # Mount point detection
+ get_mount_point() {
+     local path="$1"
+-    df -P "$path" 2>/dev/null | tail -1 | awk '{print $6}' 2>/dev/null || mount | grep "$(dirname "$path")" | head -1 | awk '{print $3}'
++    df -P "$path" 2>/dev/null | tail -n +2 | tail -1 | awk '{print $6}' 2>/dev/null || mount | grep "$(dirname "$path")" 2>/dev/null | head -1 | awk '{print $3}' || echo "/tmp"
+ }
+
+ # Check if a command exists
+ command_exists() {
+     command -v "$1" >/dev/null 2>&1
+ }
+@@ -200,7 +224,7 @@
+ # Create filesystem
+ create_filesystem() {
+     local device="$1"
+-    local fstype="${2:-ufs}"  # Default to UFS for FreeBSD
++    local fstype="${2:-$FILESYSTEM_TYPE}"  # Use the global FILESYSTEM_TYPE
+     echo "Creating $fstype filesystem on $device..."
+     case "$fstype" in
+         ext2|ext3|ext4)
+             mkfs.ext4 "$device" || return 1
+             ;;
+         xfs)
+             mkfs.xfs "$device" || return 1
+             ;;
+         btrfs)
+             mkfs.btrfs "$device" || return 1
+             ;;
+         reiserfs)
+             mkfs.reiserfs "$device" || return 1
+             ;;
+         jfs)
+             mkfs.jfs "$device" || return 1
+             ;;
+         nilfs2)
+             mkfs.nilfs2 "$device" || return 1
+             ;;
+         ufs)
+             # FreeBSD UFS creation
+             if [ "$(uname -s)" = "FreeBSD" ]; then
+                 if command -v newfs >/dev/null 2>&1; then
+                     newfs "$device" || return 1
+                 else
+                     echo "Error: newfs command not available for UFS creation"
+                     return 1
+                 fi
+             else
+                 echo "Error: UFS creation not supported on this system"
+                 return 1
+             fi
+             ;;
+         zfs)
+             # FreeBSD ZFS creation
+             if [ "$(uname -s)" = "FreeBSD" ]; then
+                 if command -v zpool >/dev/null 2>&1; then
+                     local pool_name="gobozfs_$(basename $device | sed 's/[0-9]*$//' | tr -d 'p')"
+                     if [ -z "$pool_name" ] || [ "$pool_name" = "gobozfs_" ]; then
+                         pool_name="gobozfs_main"
+                     fi
+                     echo "Creating ZFS pool: $pool_name"
+                     zpool create -f "$pool_name" "$device" || return 1
+                     # Create root dataset
+                     zfs create "$pool_name/ROOT" || return 1
+                     # Set mountpoint
+                     zfs set mountpoint=legacy "$pool_name/ROOT" || return 1
+                 else
+                     echo "Error: ZFS utilities not available"
+                     return 1
+                 fi
+             else
+                 echo "Error: ZFS creation not supported on this system"
+                 return 1
+             fi
+             ;;
+         *)
+             echo "Error: Unsupported filesystem type: $fstype"
+             return 1
+             ;;
+     esac
+     return 0
+ }
+@@ -250,7 +306,35 @@
+ # Mount filesystem
+ mount_filesystem() {
+     local device="$1"
+     local mountpoint="$2"
+     local fstype="$3"
+
++    # FreeBSD-specific mount options
++    if [ "$(uname -s)" = "FreeBSD" ]; then
++        case "$fstype" in
++            ufs)
++                mount -t ufs "$device" "$mountpoint" || {
++                    # Try alternative UFS mount options
++                    mount -o ro "$device" "$mountpoint" || return 1
++                }
++                ;;
++            zfs)
++                # For ZFS, the dataset name is passed as device
++                # Check if it's a pool/dataset format
++                if [[ "$device" == */* ]]; then
++                    # This is a dataset, mount it directly
++                    zfs mount "$device" || {
++                        # Set mountpoint and try again
++                        zfs set mountpoint="$mountpoint" "$device" 2>/dev/null
++                        zfs mount "$device" || return 1
++                    }
++                else
++                    # This is just a pool, mount its root dataset
++                    zfs mount "$device/ROOT" || return 1
++                fi
++                ;;
++            *)
++                mount "$device" "$mountpoint" || return 1
++                ;;
++        esac
++        return $?
++    fi
++
+     case "$fstype" in
+         ufs)
+             # Use UFS-specific mount command on FreeBSD
+             mount -t ufs "$device" "$mountpoint"
+             return $?
+             ;;
+         zfs)
+             # Use ZFS-specific mount command on FreeBSD
+             zfs mount "$device" "$mountpoint"
+             return $?
+             ;;
+         *)
+             mount "$device" "$mountpoint"
+             ;;
+     esac
+ }
+@@ -400,6 +484,50 @@
+     fi
+ }
+
++# FreeBSD-specific partitioning and boot functions
++create_freebsd_partitions() {
++    local device="$1"
++    local swap_size="${2:-2G}"
++    local root_size="${3:-100%FREE}"
++
++    echo "Creating FreeBSD-style partitions on $device..."
++
++    # Create GPT partition table
++    gpart create -s gpt "$device" || return 1
++
++    # Create boot partition (for UFS) - only if not ZFS
++    if [ "$FILESYSTEM_TYPE" != "zfs" ]; then
++        gpart add -t freebsd-boot -s 512k -l boot "$device" || return 1
++    fi
++
++    # Create swap partition
++    gpart add -t freebsd-swap -s "$swap_size" -l swap "$device" || return 1
++
++    # Create root partition
++    if [ "$FILESYSTEM_TYPE" = "zfs" ]; then
++        # For ZFS, we use the whole remaining space for the pool
++        gpart add -t freebsd-zfs -l root "$device" || return 1
++    else
++        # For UFS, create a UFS partition
++        gpart add -t freebsd-ufs -s "$root_size" -l rootfs "$device" || return 1
++    fi
++
++    return 0
++}
++
++# Install FreeBSD boot loader
++install_freebsd_boot_loader() {
++    local root_device="$1"
++    local boot_partition="$2"
++    local mount_point="$3"
++    local filesystem_type="$4"
++
++    echo "Installing FreeBSD boot loader for $filesystem_type on $root_device..."
++
++    # Call the specific boot installation based on filesystem type
++    if [ "$filesystem_type" = "zfs" ]; then
++        install_zfs_boot_loader "$root_device" "$mount_point"
++    else
++        install_ufs_boot_loader "$root_device" "$boot_partition" "$mount_point"
++    fi
++}
++
+ # Main installation function
+ install_system() {
+     local device="$1"
+@@ -450,6 +578,25 @@
+     # Mount the target filesystem
+     mount_filesystem "$device" "$mount_point" "$FILESYSTEM_TYPE"
+
++    # Create boot directory structure
++    mkdir -p "$mount_point/boot"
++    mkdir -p "$mount_point/etc"
++
++    # Install boot loader based on filesystem type
++    if [ "$SYSTEM_TYPE" = "freebsd" ]; then
++        install_freebsd_boot_loader "$device" "$boot_partition" "$mount_point" "$FILESYSTEM_TYPE"
++    else
++        # Original boot loader installation for other systems
++        if command -v install_boot_loader >/dev/null 2>&1; then
++            install_boot_loader "$device" "$boot_partition" "$mount_point" "$FILESYSTEM_TYPE"
++        else
++            echo "Warning: install_boot_loader function not available"
++        fi
++    fi
++
+     # Create basic directory structure
+     create_basic_structure "$mount_point"
+
+@@ -600,6 +747,50 @@
+     fi
+ }
+
++# ZFS-specific boot loader installation
++install_zfs_boot_loader() {
++    local root_device="$1"
++    local mount_point="$2"
++
++    echo "Configuring ZFS boot loader..."
++
++    # Extract pool name from the device
++    local pool_name
++    if [[ "$root_device" == */* ]]; then
++        pool_name=$(echo "$root_device" | cut -d'/' -f1)
++    else
++        # If root_device is a disk, try to find the ZFS pool
++        pool_name=$(zpool list -H -o name 2>/dev/null | head -n 1)
++    fi
++
++    if [ -n "$pool_name" ]; then
++        # Set the bootfs property for the pool
++        zpool set bootfs="$pool_name/ROOT" "$pool_name" 2>/dev/null || {
++            # If the dataset doesn't exist, try a simpler name
++            zpool set bootfs="$pool_name" "$pool_name" 2>/dev/null || true
++        }
++
++        # Create loader.conf for ZFS boot
++        cat > "$mount_point/boot/loader.conf" << EOF
++# GoboBSD ZFS Boot Configuration
++zfs_load="YES"
++geom_label_load="YES"
++vfs.root.mountfrom="zfs:$pool_name/ROOT"
++autoboot_delay="3"
++kern.geom.label.disk_ident.enable="0"
++kern.geom.label.ufs.enable="0"
++beastie_disable="YES"
++console="vidconsole"
++EOF
++
++        echo "ZFS boot configuration created successfully"
++    else
++        echo "Warning: Could not determine ZFS pool name for boot configuration"
++    fi
++}
++
++# UFS-specific boot loader installation
++install_ufs_boot_loader() {
++    local root_device="$1"
++    local boot_partition="$2"
++    local mount_point="$3"
++
++    echo "Installing UFS boot loader..."
++
++    # Install the bootcode to the GPT partition
++    if [ -b "$root_device" ]; then
++        gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 "$root_device" 2>/dev/null || {
++            # Fallback method if standard bootcode fails
++            echo "Standard bootcode failed, trying fallback method..."
++            if [ -f "/boot/boot" ] && [ -b "$root_device" ]; then
++                dd if=/boot/boot of="$root_device" bs=1k count=1 conv=sync 2>/dev/null || true
++            fi
++        }
++    fi
++
++    # Create loader.conf for UFS boot
++    cat > "$mount_point/boot/loader.conf" << EOF
++# GoboBSD UFS Boot Configuration
++autoboot_delay="3"
++kern.geom.label.disk_ident.enable="0"
++kern.geom.label.ufs.enable="0"
++beastie_disable="YES"
++console="vidconsole"
++EOF
++
++    echo "UFS boot loader installed successfully"
++}
++
+ # Print usage information
+ print_usage() {
+     echo "GoboLinux Installer v0.16"

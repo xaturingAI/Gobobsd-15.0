@@ -1,0 +1,34 @@
+diff -Naur Scripts-org/2.9.6/Functions/Process Scripts/2.9.6/Functions/Process
+--- Scripts-org/2.9.6/Functions/Process	2008-12-21 15:27:21.000000000 +0000
++++ Scripts/2.9.6/Functions/Process	2024-01-04 12:00:00.000000000 +0000
+@@ -15,7 +15,7 @@
+ # Check if a process is running
+ Is_Process_Running()
+ {
+-    local pid="$1"
+-    if kill -0 "$pid" 2>/dev/null; then
++    local pid="$1"
++    if kill -0 "$pid" 2>/dev/null && ps -p "$pid" >/dev/null 2>&1; then
+         return 0
+     else
+         return 1
+@@ -35,7 +35,7 @@
+ # Get process ID by name
+ Get_PID_By_Name()
+ {
+-    local process_name="$1"
+-    local pid=$(pgrep -f "$process_name" | head -1)
++    local process_name="$1"
++    local pid=$(pgrep -f "$process_name" 2>/dev/null | head -1 || ps aux | grep "$process_name" | grep -v grep | awk '{print $2}' | head -1)
+     echo "$pid"
+ }
+ 
+@@ -55,7 +55,7 @@
+ # Kill process by name
+ Kill_Process_By_Name()
+ {
+-    local process_name="$1"
+-    pkill -f "$process_name"
++    local process_name="$1"
++    pkill -f "$process_name" 2>/dev/null || kill -9 $(ps aux | grep "$process_name" | grep -v grep | awk '{print $2}') 2>/dev/null
+ }
