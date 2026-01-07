@@ -110,7 +110,7 @@ cat > /System/Settings/sddm.conf.d/gobobsd.conf << "SDDMCONF"
 EnableHiDPI=false
 
 [Wayland]
-Enable=false
+Enable=true
 
 [Users]
 MaximumUid=60000
